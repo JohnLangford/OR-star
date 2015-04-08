@@ -2,10 +2,10 @@
 A relativistic solution to Einstein's equations and a ray tracer for that solution
 
 Usage:
-./OR-star &lt;impact&gt; <flux> <photon_radius> <photon_radial_velocity> [nobreak]
+./OR-star &lt;impact&gt; &lt;flux&gt; &lt;photon_radius&gt; &lt;photon_radial_velocity&gt; [nobreak]
 
-<impact> and <flux> define the OR-star while <photon_radius> and
-<photon_radial_velocity> define the starting radius and angle of a
+&lt;impact&gt; and &lt;flux&gt; define the OR-star while &lt;photon_radius&gt; and
+&lt;photon_radial_velocity&gt; define the starting radius and angle of a
 photon interacting with the OR-star.  Photons on the characteristic
 geodesic must be handled carefully---the [nobreak] argument makes them
 reflect inside while by default the simulation ends.
