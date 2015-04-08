@@ -2,6 +2,7 @@
 A relativistic solution to Einstein's equations and a ray tracer for that solution
 
 Usage:
+make
 ./OR-star &lt;impact&gt; &lt;flux&gt; &lt;photon_radius&gt; &lt;photon_radial_velocity&gt; [nobreak]
 
 &lt;impact&gt; and &lt;flux&gt; define the OR-star while
