@@ -4,7 +4,7 @@
 
 using namespace std;
 
-double sim_scale = 0.00001;
+double sim_scale = 0.000005;
 int clocks = 100000000;
 
 struct ab {
@@ -87,7 +87,7 @@ ab find_nearest(double radius, size_t& hint)
   // a * hint_radius + (1-a)*second_radius = radius
   // => a * (hint_radius - second_radius) = radius - second_radius
   // => a = (radius - second_radius) / (hint_radius - second_radius)
-  float hint_mix = (radius - geometry[second_best].radius) / (geometry[hint].radius - geometry[second_best].radius);
+  double hint_mix = (radius - geometry[second_best].radius) / (geometry[hint].radius - geometry[second_best].radius);
   
   ret.A = hint_mix * geometry[hint].geom.A + (1 - hint_mix) * geometry[second_best].geom.A;
   ret.B = hint_mix * geometry[hint].geom.B + (1 - hint_mix) * geometry[second_best].geom.B;
@@ -179,7 +179,7 @@ int main(int argc, char* argv[])
       current = new_rAB;
       if ( impact * impact * current.geom.A / (current.radius * current.radius) > 1)
 	{
-	  cerr << "reached outer radius, total mass = " << m(current) << " total flux = " << i * sim_scale * e_at_origin << endl;
+	  cerr << "reached outer radius" << endl;
 	  break;
 	}
     }
@@ -209,6 +209,7 @@ int main(int argc, char* argv[])
   size_t hint = 0;
   cout << "radius\t" << "angle\t" << "vr\t" << "vperp\t" << "x\t" << "y\t" << "A\t" << "B\t" << "hint\t" << endl;
 
+  double total_time = 0;
   for (int i = 0; i < clocks; i++)
     {
       ab geom = find_nearest(ray.radius, hint);
@@ -222,12 +223,12 @@ int main(int argc, char* argv[])
 	  "\t" << hint << endl;   
       
       double sqrt_A = sqrt(geom.A);
+      total_time += sqrt_A;
 
       double derived_impact = ray.vperp * ray.radius / sqrt_A;
 
       double delta_radius = ray.vr * sim_scale * sqrt_A;
       double delta_perp = ray.vperp * sim_scale * sqrt_A;
-      
       double new_radius = sqrt((ray.radius+delta_radius)*(ray.radius+delta_radius) 
 			       + delta_perp*delta_perp);
       ab geom_new = find_nearest(new_radius, hint);
@@ -240,7 +241,11 @@ int main(int argc, char* argv[])
 	{
 	  if (breaker)
 	    {	  
-	      cerr << "reached outer radius" << endl;
+	      cerr << "reached outer radius, total mass = " << m(current) << " total flux = " << total_time * sim_scale * e_at_origin 
+		   << " total mass / total flux = " << m(current) / (total_time * sim_scale * e_at_origin) 
+		   << " A_inf / A_1 = " << schwarz_k 
+		   << " total mass / total flux * A_inf/A_1 = " << m(current) / (total_time * sim_scale * e_at_origin) * powf(schwarz_k, 1)
+		   << endl;
 	      break;
 	    }
 	  new_vr = - ray.vr;
