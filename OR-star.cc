@@ -145,6 +145,12 @@ struct photon {
   double vperp;
 };
 
+double A_inf(double radius, ab geom)
+{
+  double schwarz_r = radius * (1. - 1. / geom.B);
+  return geom.A / (1. - schwarz_r / radius);  
+}
+
 int main(int argc, char* argv[])
 {
   double impact = 1.;
@@ -207,21 +213,29 @@ int main(int argc, char* argv[])
     breaker = false;
 
   size_t hint = 0;
-  cout << "radius\t" << "angle\t" << "vr\t" << "vperp\t" << "x\t" << "y\t" << "A\t" << "B\t" << "hint\t" << endl;
+  cout << "radius\t" << "angle\t" << "vr\t" << "vperp\t" << "x\t" << "y\t" << "A\t" << "B\t" << "invar\t" << "hint\t" << endl;
 
   double total_time = 0;
+  double last_mass = 0;
+  double last_time = 0;
   for (int i = 0; i < clocks; i++)
     {
       ab geom = find_nearest(ray.radius, hint);
 
+      rAB local = {ray.radius, geom};
       if (i % 100 == 0)
-	cout << ray.radius << "\t" << ray.origin_angle << "\t" << ray.vr << "\t" << ray.vperp << 
-	  "\t" << ray.radius * cos(ray.origin_angle) << 
-	  "\t" << ray.radius * sin(ray.origin_angle) << 
-	  "\t" << geom.A << 
-	  "\t" << geom.B << 
-	  "\t" << hint << endl;   
-      
+	{
+	  cout << ray.radius << "\t" << ray.origin_angle << "\t" << ray.vr << "\t" << ray.vperp << 
+	    "\t" << ray.radius * cos(ray.origin_angle) << 
+	    "\t" << ray.radius * sin(ray.origin_angle) << 
+	    "\t" << geom.A << 
+	    "\t" << geom.B << 
+	    "\t" << (m(local) - last_mass) * (A_inf(ray.radius, geom) / (total_time * sim_scale * e_at_origin) - last_time)  <<
+	    "\t" << hint << endl;   
+	}      
+      last_mass = m(local);
+      last_time = A_inf(ray.radius, geom) / (total_time * sim_scale * e_at_origin);
+
       double sqrt_A = sqrt(geom.A);
       total_time += sqrt_A;
 
