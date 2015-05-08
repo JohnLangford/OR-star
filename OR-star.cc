@@ -218,6 +218,9 @@ int main(int argc, char* argv[])
   double total_time = 0;
   double last_mass = 0;
   double last_time = 0;
+
+  ab geom = find_nearest(ray.radius, hint);
+  double derived_impact = ray.vperp * ray.radius / sqrt(geom.A);
   for (int i = 0; i < clocks; i++)
     {
       ab geom = find_nearest(ray.radius, hint);
@@ -225,21 +228,21 @@ int main(int argc, char* argv[])
       rAB local = {ray.radius, geom};
       if (i % 100 == 0)
 	{
-	  cout << ray.radius << "\t" << ray.origin_angle << "\t" << ray.vr << "\t" << ray.vperp << 
+	  cout << /*ray.radius << "\t" << ray.origin_angle << "\t" << ray.vr << "\t" << ray.vperp << 
 	    "\t" << ray.radius * cos(ray.origin_angle) << 
 	    "\t" << ray.radius * sin(ray.origin_angle) << 
 	    "\t" << geom.A << 
-	    "\t" << geom.B << 
-	    "\t" << (m(local) - last_mass) * (A_inf(ray.radius, geom) / (total_time * sim_scale * e_at_origin) - last_time)  <<
-	    "\t" << hint << endl;   
-	}      
+	    "\t" << geom.B << */ 
+	    "\t" << m(local) - last_mass <<
+	    "\t" << total_time * sim_scale * e_at_origin - last_time  <<
+	    "\t" << m(local) / (total_time * sim_scale * e_at_origin)  << endl;
+	    //	    "\t" << hint << endl;   
+	}
       last_mass = m(local);
-      last_time = A_inf(ray.radius, geom) / (total_time * sim_scale * e_at_origin);
+      last_time = total_time * sim_scale * e_at_origin;
 
       double sqrt_A = sqrt(geom.A);
-      total_time += sqrt_A;
-
-      double derived_impact = ray.vperp * ray.radius / sqrt_A;
+      total_time += 1;
 
       double delta_radius = ray.vr * sim_scale * sqrt_A;
       double delta_perp = ray.vperp * sim_scale * sqrt_A;
@@ -247,7 +250,49 @@ int main(int argc, char* argv[])
 			       + delta_perp*delta_perp);
       ab geom_new = find_nearest(new_radius, hint);
       
-      double new_vperp = derived_impact * sqrt(geom_new.A) / new_radius;
+
+      /* (dr/domega)^2 = r^4 / B * (1/(b^2 A) - 1/r^2)
+	 
+	 so
+	 
+	 dr/domega = r^2 / B^0.5 * (1/(b^2 A) - 1/r^2)^0.5
+
+	 so 
+	 
+	 dr/r domega = (r^2/(b^2 A) - 1)^0.5 / B^0.5
+
+	 so
+
+	 dr/dperp = (r^2/(b^2 A) - 1)^0.5 / B^0.5
+
+	 so 
+
+	 dr = (r^2/(b^2 A) - 1)^0.5 / B^0.5 dperp
+
+	 Also
+
+	 dperp^2 + dr^2 = 1
+
+	 so 
+
+	 dperp^2 (1 + (r^2/(b^2 A) - 1) / B) = 1
+	 
+	 so 
+
+	 dperp^2 (1 - 1/B + r^2/(b^2 A B)) = 1
+	 
+	 so 
+
+	 dperp (1 - 1/B + r^2/(b^2 A B))^0.5 = 1
+
+	 so 
+
+	 dperp = 1 / (1 - 1/B + r^2/(b^2 A B))^0.5
+      */
+      
+      double new_vperp = 1. / ( 1 - 1 / geom_new.B + new_radius * new_radius / (derived_impact * derived_impact * geom_new.A * geom_new.B));
+
+				//derived_impact * sqrt(geom_new.A) / new_radius; // wtf???  Should be dperp = dr / sqrt(r^2/(b^2 A) - 1)
       double s_radius = sign(new_radius - ray.radius);
 
       double new_vr;
