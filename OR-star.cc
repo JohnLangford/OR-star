@@ -271,26 +271,26 @@ int main(int argc, char* argv[])
 
 	 Also
 
-	 dperp^2 + dr^2 = 1
+	 dperp^2 + B dr^2 = 1
 
 	 so 
 
-	 dperp^2 (1 + (r^2/(b^2 A) - 1) / B) = 1
+	 dperp^2 (1 + B (r^2/(b^2 A) - 1) / B) = 1
 	 
 	 so 
 
-	 dperp^2 (1 - 1/B + r^2/(b^2 A B)) = 1
+	 dperp^2 (r^2/(b^2 A)) = 1
 	 
 	 so 
 
-	 dperp (1 - 1/B + r^2/(b^2 A B))^0.5 = 1
+	 dperp (r^2/(b^2 A))^0.5 = 1
 
 	 so 
 
-	 dperp = 1 / (1 - 1/B + r^2/(b^2 A B))^0.5
+	 dperp = b A^0.5 / r
       */
       
-      double new_vperp = 1. / ( 1 - 1 / geom_new.B + new_radius * new_radius / (derived_impact * derived_impact * geom_new.A * geom_new.B));
+      double new_vperp = 1. / sqrt( 1 - 1 / geom_new.B + new_radius * new_radius / (derived_impact * derived_impact * geom_new.A * geom_new.B));
 
 				//derived_impact * sqrt(geom_new.A) / new_radius; // wtf???  Should be dperp = dr / sqrt(r^2/(b^2 A) - 1)
       double s_radius = sign(new_radius - ray.radius);
