@@ -226,6 +226,8 @@ int main(int argc, char* argv[])
       ab geom = find_nearest(ray.radius, hint);
 
       rAB local = {ray.radius, geom};
+
+      double A_inf = geom.A / (1. - (2. * m(local) / ray.radius));
       if (i % 100 == 0)
 	{
 	  cout << /*ray.radius << "\t" << ray.origin_angle << "\t" << ray.vr << "\t" << ray.vperp << 
@@ -235,7 +237,7 @@ int main(int argc, char* argv[])
 	    "\t" << geom.B << */ 
 	    "\t" << m(local) - last_mass <<
 	    "\t" << total_time * sim_scale * e_at_origin - last_time  <<
-	    "\t" << m(local) / (total_time * sim_scale * e_at_origin)  << endl;
+	    "\t" << m(local) / (total_time * sim_scale * e_at_origin) * A_inf << endl;
 	    //	    "\t" << hint << endl;   
 	}
       last_mass = m(local);
@@ -246,10 +248,7 @@ int main(int argc, char* argv[])
 
       double delta_radius = ray.vr * sim_scale * sqrt_A;
       double delta_perp = ray.vperp * sim_scale * sqrt_A;
-      double new_radius = sqrt((ray.radius+delta_radius)*(ray.radius+delta_radius) 
-			       + delta_perp*delta_perp);
-      ab geom_new = find_nearest(new_radius, hint);
-      
+      double new_radius = ray.radius+delta_radius;
 
       /* (dr/domega)^2 = r^4 / B * (1/(b^2 A) - 1/r^2)
 	 
@@ -271,28 +270,35 @@ int main(int argc, char* argv[])
 
 	 Also
 
-	 dperp^2 + B dr^2 = 1
+	 dperp^2 + B dr^2 = dtau^2
 
 	 so 
 
-	 dperp^2 (1 + B (r^2/(b^2 A) - 1) / B) = 1
+	 dperp^2 (1 + B (r^2/(b^2 A) - 1) / B) = dtau^2
 	 
 	 so 
 
-	 dperp^2 (r^2/(b^2 A)) = 1
+	 dperp^2 (r^2/(b^2 A)) = dtau^2
 	 
 	 so 
 
-	 dperp (r^2/(b^2 A))^0.5 = 1
+	 dperp (r^2/(b^2 A))^0.5 = dtau
 
 	 so 
 
-	 dperp = b A^0.5 / r
+	 dperp / dtau = b A^0.5 / r
+
+	 also:
+
+	 dperp^2 / dtau^2 + B dr^2 / dtau^2 =  1
+
+	 so
+	 dr / dtau  = ((1 - dperp^2 / dtau^2)/B)^0.5
+
       */
       
-      double new_vperp = 1. / sqrt( 1 - 1 / geom_new.B + new_radius * new_radius / (derived_impact * derived_impact * geom_new.A * geom_new.B));
+      double new_vperp = derived_impact * sqrt_A / new_radius;
 
-				//derived_impact * sqrt(geom_new.A) / new_radius; // wtf???  Should be dperp = dr / sqrt(r^2/(b^2 A) - 1)
       double s_radius = sign(new_radius - ray.radius);
 
       double new_vr;
@@ -309,13 +315,11 @@ int main(int argc, char* argv[])
 	    }
 	  new_vr = - ray.vr;
 	  delta_radius = new_vr * sim_scale * sqrt_A;
-	  new_radius = sqrt((ray.radius+delta_radius)*(ray.radius+delta_radius) 
-			    + delta_perp*delta_perp);
-	  geom_new = find_nearest(new_radius, hint);
-	  new_vperp = derived_impact * sqrt(geom_new.A) / new_radius;
+	  new_radius = ray.radius+delta_radius;
+	  new_vperp = derived_impact * sqrt_A / new_radius;
 	}
       else
-	new_vr = s_radius * sqrt (1. - new_vperp * new_vperp);
+	new_vr = s_radius * sqrt ((1. - new_vperp * new_vperp)/geom.B);
 
       double new_origin_angle = ray.origin_angle + asin(delta_perp / ray.radius);
 
