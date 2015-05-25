@@ -139,10 +139,11 @@ double phi(rAB current)
 }
 
 struct photon {
-  double radius;
-  double origin_angle;
-  double vr;
-  double vperp;
+  double radius_minus_initial; //change in photon radius from starting
+			//point. (change instead of total required for
+			//precision reasons)
+  double origin_angle; //photon origin angle as accumulated.
+  double vperp; //photon coordinate fractin in perpendicular direction of local geometry
 };
 
 double A_inf(double radius, ab geom)
@@ -185,7 +186,7 @@ int main(int argc, char* argv[])
       current = new_rAB;
       if ( impact * impact * current.geom.A / (current.radius * current.radius) > 1)
 	{
-	  cerr << "reached outer radius" << endl;
+	  cerr << "reached outer radius at " << i << endl;
 	  break;
 	}
     }
@@ -197,136 +198,91 @@ int main(int argc, char* argv[])
   if (i == clocks)
     cerr << "ran out of clock ticks" << endl;
 
-  photon ray = {impact, 0., 0., 1.};
-
+  double initial_radius = impact;
+  photon ray = {0., 0., 1.};
+  
   if (argc>3)
-    ray.radius = atof(argv[3]);
+    initial_radius = atof(argv[3]);
+  size_t hint = 0;
+  ab geom = find_nearest(initial_radius, hint);
 
   if (argc>4)
     {
-      ray.vr = atof(argv[4]);
-      ray.vperp = sqrt(1-ray.vr*ray.vr);
+      double vr = atof(argv[4]);
+      ray.vperp = sqrt(1-vr*vr);
     }
 
   bool breaker = true;
   if (argc>5)
     breaker = false;
 
-  size_t hint = 0;
-  cout << "radius\t" << "angle\t" << "vr\t" << "vperp\t" << "x\t" << "y\t" << "A\t" << "B\t" << "invar\t" << "hint\t" << endl;
+  cout << "radius\t" << "angle\t" << "vr\t" << "vperp\t" << "x\t" << "y\t" << "A\t" << "B\t" << "hint\t" << endl;
 
+  impact = ray.vperp * initial_radius / sqrt(geom.A);
   double total_time = 0;
-  double last_mass = 0;
-  double last_time = 0;
-
-  ab geom = find_nearest(ray.radius, hint);
-  double derived_impact = ray.vperp * ray.radius / sqrt(geom.A);
+  double m_last = 0;
   for (int i = 0; i < clocks; i++)
-    {
-      ab geom = find_nearest(ray.radius, hint);
-
-      rAB local = {ray.radius, geom};
-
-      double A_inf = geom.A / (1. - (2. * m(local) / ray.radius));
+    {//each tic is sim_scale at a constant radius (i.e. a dt up to multiplicative constant)
+      double radius = initial_radius+ray.radius_minus_initial;
+      if (radius > 400)
+	break;
+      rAB local = {radius, geom};
       if (i % 100 == 0)
 	{
-	  cout << /*ray.radius << "\t" << ray.origin_angle << "\t" << ray.vr << "\t" << ray.vperp << 
-	    "\t" << ray.radius * cos(ray.origin_angle) << 
-	    "\t" << ray.radius * sin(ray.origin_angle) << 
+	  cout << radius << "\t" << ray.origin_angle << "\t" << "was vr" << "\t" << ray.vperp << 
+	    "\t" << radius * cos(ray.origin_angle) << 
+	    "\t" << radius * sin(ray.origin_angle) << 
 	    "\t" << geom.A << 
-	    "\t" << geom.B << */ 
-	    "\t" << m(local) - last_mass <<
-	    "\t" << total_time * sim_scale * e_at_origin - last_time  <<
-	    "\t" << m(local) / (total_time * sim_scale * e_at_origin) * A_inf << endl;
-	    //	    "\t" << hint << endl;   
+	    "\t" << geom.B <<  
+	    "\t" << hint << endl;   
+	  //	  cout << m(local) * A_inf(radius, geom) / (i * sim_scale * e_at_origin) << "\t" << m(local) - m_last << "\t" << radius << endl;
 	}
-      last_mass = m(local);
-      last_time = total_time * sim_scale * e_at_origin;
 
-      double sqrt_A = sqrt(geom.A);
-      total_time += 1;
-
-      double delta_radius = ray.vr * sim_scale * sqrt_A;
+      m_last = m(local);
+      double sqrt_A = sqrt(geom.A); //conversion between local and asymptotic rest frame time
       double delta_perp = ray.vperp * sim_scale * sqrt_A;
-      double new_radius = ray.radius+delta_radius;
+      double delta_radius = delta_perp * sqrt((radius*radius / (impact * impact * geom.A) - 1.) / geom.B);
+      total_time += sqrt_A;
 
-      /* (dr/domega)^2 = r^4 / B * (1/(b^2 A) - 1/r^2)
-	 
-	 so
-	 
-	 dr/domega = r^2 / B^0.5 * (1/(b^2 A) - 1/r^2)^0.5
-
-	 so 
-	 
-	 dr/r domega = (r^2/(b^2 A) - 1)^0.5 / B^0.5
-
-	 so
-
-	 dr/dperp = (r^2/(b^2 A) - 1)^0.5 / B^0.5
-
-	 so 
-
-	 dr = (r^2/(b^2 A) - 1)^0.5 / B^0.5 dperp
-
-	 Also
-
-	 dperp^2 + B dr^2 = dtau^2
-
-	 so 
-
-	 dperp^2 (1 + B (r^2/(b^2 A) - 1) / B) = dtau^2
-	 
-	 so 
-
-	 dperp^2 (r^2/(b^2 A)) = dtau^2
-	 
-	 so 
-
-	 dperp (r^2/(b^2 A))^0.5 = dtau
-
-	 so 
-
-	 dperp / dtau = b A^0.5 / r
-
-	 also:
-
-	 dperp^2 / dtau^2 + B dr^2 / dtau^2 =  1
-
-	 so
-	 dr / dtau  = ((1 - dperp^2 / dtau^2)/B)^0.5
-
-      */
+      double new_radius_minus_initial;//force ourselves to not be stuck on an inner radius
+      if (fabs(delta_radius) < sim_scale * sim_scale)
+	new_radius_minus_initial = ray.radius_minus_initial + sign(delta_radius) * sim_scale * sim_scale;
+      else	
+	new_radius_minus_initial = ray.radius_minus_initial+delta_radius;
       
-      double new_vperp = derived_impact * sqrt_A / new_radius;
+      /* (dr/domega)^2 = r^4 / B * (1/(b^2 A) - 1/r^2)
+	 so
+	 dr/domega = r^2 / B^0.5 * (1/(b^2 A) - 1/r^2)^0.5
+	 so 
+	 dr/r domega = (r^2/(b^2 A) - 1)^0.5 / B^0.5
+	 so
+	 dr/dperp = (r^2/(b^2 A) - 1)^0.5 / B^0.5
+	 so 
+	 dr = (r^2/(b^2 A) - 1)^0.5 / B^0.5 dperp
+	 Also
+	 A dt^2 = B dr^2 + dperp^2
+      */
 
-      double s_radius = sign(new_radius - ray.radius);
+      double new_vperp = impact * sqrt_A / radius;//Conservation of angular momentum
 
-      double new_vr;
-      if (1. < new_vperp * new_vperp) // This is not possible with infinite precision.  It can only happen when vr is extremely small.  We assume that this is a turnaround point.
-	{
+      if (1. < new_vperp * new_vperp) 
+	{ // This is not possible with infinite precision.  It can
+	  // only happen when vr is extremely small.  Assume this is a
+	  // turning point.
 	  if (breaker)
 	    {	  
-	      cerr << "reached outer radius, total mass = " << m(current) << " total flux = " << total_time * sim_scale * e_at_origin 
-		   << " total mass / total flux = " << m(current) / (total_time * sim_scale * e_at_origin) 
-		   << " A_inf / A_1 = " << schwarz_k 
-		   << " total mass / total flux * A_inf/A_1 = " << m(current) / (total_time * sim_scale * e_at_origin) * powf(schwarz_k, 1)
-		   << endl;
+	      cerr << "reached outer radius, total mass = " << m(current) << endl;
 	      break;
 	    }
-	  new_vr = - ray.vr;
-	  delta_radius = new_vr * sim_scale * sqrt_A;
-	  new_radius = ray.radius+delta_radius;
-	  new_vperp = derived_impact * sqrt_A / new_radius;
+	  delta_radius = -delta_radius;
+	  new_radius_minus_initial = ray.radius_minus_initial+delta_radius;
+	  new_vperp = impact * sqrt_A / radius;
 	}
-      else
-	new_vr = s_radius * sqrt ((1. - new_vperp * new_vperp)/geom.B);
-
-      double new_origin_angle = ray.origin_angle + asin(delta_perp / ray.radius);
-
-      photon new_ray = {new_radius, new_origin_angle, new_vr, new_vperp};
-
-      if (new_radius > 400)
-	break;
+      
+      double new_origin_angle = ray.origin_angle + asin(delta_perp / radius);
+      
+      photon new_ray = {new_radius_minus_initial, new_origin_angle, new_vperp};
       ray = new_ray;
+      geom = find_nearest(radius, hint);
       }
 }
