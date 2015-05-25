@@ -229,7 +229,7 @@ int main(int argc, char* argv[])
       rAB local = {radius, geom};
       if (i % 100 == 0)
 	{
-	  cout << radius << "\t" << ray.origin_angle << "\t" << "was vr" << "\t" << ray.vperp << 
+	  cout << radius << "\t" << ray.origin_angle << "\t" << "was_vr" << "\t" << ray.vperp << 
 	    "\t" << radius * cos(ray.origin_angle) << 
 	    "\t" << radius * sin(ray.origin_angle) << 
 	    "\t" << geom.A << 
