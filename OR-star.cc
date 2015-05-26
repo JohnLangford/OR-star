@@ -221,6 +221,7 @@ int main(int argc, char* argv[])
   impact = ray.vperp * initial_radius / sqrt(geom.A);
   double total_time = 0;
   double m_last = 0;
+  double old_delta_radius = 0;
   for (int i = 0; i < clocks; i++)
     {//each tic is sim_scale at a constant radius (i.e. a dt up to multiplicative constant)
       double radius = initial_radius+ray.radius_minus_initial;
@@ -241,14 +242,33 @@ int main(int argc, char* argv[])
       m_last = m(local);
       double sqrt_A = sqrt(geom.A); //conversion between local and asymptotic rest frame time
       double delta_perp = ray.vperp * sim_scale * sqrt_A;
-      double delta_radius = delta_perp * sqrt((radius*radius / (impact * impact * geom.A) - 1.) / geom.B);
+      double delta_radius;
+      if (radius*radius / (impact * impact * geom.A) - 1. >= 0) 
+	delta_radius = delta_perp * sqrt((radius*radius / (impact * impact * geom.A) - 1.) / geom.B);
+      else
+	{
+	  // This is not possible with infinite precision.  It can
+	  // only happen when vr is extremely small.  Assume this is a
+	  // turning point.
+	  if (breaker)
+	    {	  
+	      cerr << "reached outer radius, total mass = " << m(current) << endl;
+	      break;
+	    }
+	  delta_radius = -old_delta_radius;
+	}
+      old_delta_radius = delta_radius;
+
+      //      cout << "delta_radius = " << delta_radius << "\t" << delta_perp << "\t" << fabs((radius*radius / (impact * impact * geom.A) - 1.) / geom.B) << endl;
       total_time += sqrt_A;
 
-      double new_radius_minus_initial;//force ourselves to not be stuck on an inner radius
+      double new_radius_minus_initial;//force ourselves to not be stuck at a turning point
       if (fabs(delta_radius) < sim_scale * sim_scale)
 	new_radius_minus_initial = ray.radius_minus_initial + sign(delta_radius) * sim_scale * sim_scale;
-      else	
+      else {
+	cerr << "bouncing off initial" << endl;
 	new_radius_minus_initial = ray.radius_minus_initial+delta_radius;
+      }
       
       /* (dr/domega)^2 = r^4 / B * (1/(b^2 A) - 1/r^2)
 	 so
@@ -264,21 +284,6 @@ int main(int argc, char* argv[])
       */
 
       double new_vperp = impact * sqrt_A / radius;//Conservation of angular momentum
-
-      if (1. < new_vperp * new_vperp) 
-	{ // This is not possible with infinite precision.  It can
-	  // only happen when vr is extremely small.  Assume this is a
-	  // turning point.
-	  if (breaker)
-	    {	  
-	      cerr << "reached outer radius, total mass = " << m(current) << endl;
-	      break;
-	    }
-	  delta_radius = -delta_radius;
-	  new_radius_minus_initial = ray.radius_minus_initial+delta_radius;
-	  new_vperp = impact * sqrt_A / radius;
-	}
-      
       double new_origin_angle = ray.origin_angle + asin(delta_perp / radius);
       
       photon new_ray = {new_radius_minus_initial, new_origin_angle, new_vperp};
