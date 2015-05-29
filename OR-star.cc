@@ -144,6 +144,7 @@ struct photon {
 			//precision reasons)
   double origin_angle; //photon origin angle as accumulated.
   double vperp; //photon coordinate fractin in perpendicular direction of local geometry
+  double sign; //going "out" or going "in"
 };
 
 double A_inf(double radius, ab geom)
@@ -199,7 +200,7 @@ int main(int argc, char* argv[])
     cerr << "ran out of clock ticks" << endl;
 
   double initial_radius = impact;
-  photon ray = {0., 0., 1.};
+  photon ray = {0., 0., 1., 1.};
   
   if (argc>3)
     initial_radius = atof(argv[3]);
@@ -210,6 +211,7 @@ int main(int argc, char* argv[])
     {
       double vr = atof(argv[4]);
       ray.vperp = sqrt(1-vr*vr);
+      ray.sign = sign(vr);
     }
 
   bool breaker = true;
@@ -221,10 +223,11 @@ int main(int argc, char* argv[])
   impact = ray.vperp * initial_radius / sqrt(geom.A);
   double total_time = 0;
   double m_last = 0;
-  double old_delta_radius = 0;
+  photon last_good;
   for (int i = 0; i < clocks; i++)
     {//each tic is sim_scale at a constant radius (i.e. a dt up to multiplicative constant)
       double radius = initial_radius+ray.radius_minus_initial;
+      geom = find_nearest(radius, hint);
       if (radius > 400)
 	break;
       rAB local = {radius, geom};
@@ -241,35 +244,9 @@ int main(int argc, char* argv[])
 
       m_last = m(local);
       double sqrt_A = sqrt(geom.A); //conversion between local and asymptotic rest frame time
+      total_time += sqrt_A;
       double delta_perp = ray.vperp * sim_scale * sqrt_A;
       double delta_radius;
-      if (radius*radius / (impact * impact * geom.A) - 1. >= 0) 
-	delta_radius = delta_perp * sqrt((radius*radius / (impact * impact * geom.A) - 1.) / geom.B);
-      else
-	{
-	  // This is not possible with infinite precision.  It can
-	  // only happen when vr is extremely small.  Assume this is a
-	  // turning point.
-	  if (breaker)
-	    {	  
-	      cerr << "reached outer radius, total mass = " << m(current) << endl;
-	      break;
-	    }
-	  delta_radius = -old_delta_radius;
-	}
-      old_delta_radius = delta_radius;
-
-      //      cout << "delta_radius = " << delta_radius << "\t" << delta_perp << "\t" << fabs((radius*radius / (impact * impact * geom.A) - 1.) / geom.B) << endl;
-      total_time += sqrt_A;
-
-      double new_radius_minus_initial;//force ourselves to not be stuck at a turning point
-      if (fabs(delta_radius) < sim_scale * sim_scale)
-	new_radius_minus_initial = ray.radius_minus_initial + sign(delta_radius) * sim_scale * sim_scale;
-      else {
-	cerr << "bouncing off initial" << endl;
-	new_radius_minus_initial = ray.radius_minus_initial+delta_radius;
-      }
-      
       /* (dr/domega)^2 = r^4 / B * (1/(b^2 A) - 1/r^2)
 	 so
 	 dr/domega = r^2 / B^0.5 * (1/(b^2 A) - 1/r^2)^0.5
@@ -282,12 +259,42 @@ int main(int argc, char* argv[])
 	 Also
 	 A dt^2 = B dr^2 + dperp^2
       */
-
+      if (radius*radius / (impact * impact * geom.A) - 1. >= 0) //we can run forward.
+	{
+	  delta_radius = ray.sign * delta_perp * sqrt((radius*radius / (impact * impact * geom.A) - 1.) / geom.B);
+	  if (fabs(delta_radius) > 10*sim_scale*sim_scale) //The delta_radius is large enough to work.
+	    last_good = ray;
+	}
+      else
+	{ // This is not possible with infinite precision.  It can
+	  // only happen when vr is extremely small.  Assume this is a
+	  // turning point.
+	  if (breaker)
+	    {	  
+	      cerr << "reached turning point, total mass = " << m(current) << " and hint = " << hint << " A_inf = " << A_inf(radius,geom) <<  endl;
+	      break;
+	    }
+	  else 
+	    {// use the last_good ray with the sign of vr switched.
+	      cerr << "at turnint point " << endl;
+	      ray = last_good;
+	      ray.sign = -ray.sign;
+	      continue;
+	    }
+	}
+      double new_radius_minus_initial;
+      if (fabs(delta_radius) < sim_scale * sim_scale) //force ourselves to not be stuck at a turning point
+	{
+	  new_radius_minus_initial = ray.radius_minus_initial + sign(delta_radius) * sim_scale * sim_scale;
+	  cerr << "bumping radius upwards to avoid first order solution failure" << endl;
+	}
+      else 
+	new_radius_minus_initial = ray.radius_minus_initial+delta_radius;
+      
       double new_vperp = impact * sqrt_A / radius;//Conservation of angular momentum
       double new_origin_angle = ray.origin_angle + asin(delta_perp / radius);
       
-      photon new_ray = {new_radius_minus_initial, new_origin_angle, new_vperp};
+      photon new_ray = {new_radius_minus_initial, new_origin_angle, new_vperp, ray.sign};
       ray = new_ray;
-      geom = find_nearest(radius, hint);
       }
 }
